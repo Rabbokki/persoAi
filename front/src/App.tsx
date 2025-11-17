@@ -1,4 +1,3 @@
-// front/src/App.tsx
 import { useState } from 'react';
 import { askQuestion } from './api';
 

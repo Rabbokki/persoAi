@@ -1,4 +1,4 @@
-# ai/main.py ← 이 코드로 완전히 교체 (Gemini → OpenAI)
+# ai/main.py ← 이 코드로 완전히 교체 (Railway 100% 호환 버전)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,17 +8,12 @@ from supabase import create_client
 import os
 import json
 from dotenv import load_dotenv
-from mangum import Mangum
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
 
 load_dotenv()
 
 app = FastAPI()
 
+# CORS 허용
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,18 +22,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Supabase 연결
 supabase = create_client(
     os.getenv("VITE_SUPABASE_URL"),
     os.getenv("VITE_SUPABASE_ANON_KEY")
 )
 
-# OpenAI 클라이언트
+# OpenAI 연결
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class Question(BaseModel):
     question: str
 
-# 임베딩 생성 함수 (OpenAI text-embedding-3-small, 1536차원)
+# 임베딩 생성
 def get_embedding(text: str):
     response = client.embeddings.create(
         input=text,
@@ -46,37 +42,35 @@ def get_embedding(text: str):
     )
     return response.data[0].embedding
 
-# DB 초기화 (최초 1회만!)
+# DB 초기화
 @app.get("/init-db")
 async def init_db():
     try:
         with open("../data/qa.json", "r", encoding="utf-8") as f:
             qa_list = json.load(f)
 
-        # 기존 데이터 삭제
         supabase.table("embeddings").delete().neq("id", 0).execute()
 
-        # 새로 삽입 (차원 1536으로 변경!)
         for item in qa_list:
             emb = get_embedding(item["question"])
             supabase.table("embeddings").insert({
                 "question": item["question"],
                 "answer": item["answer"],
-                "embedding": emb  # 1536차원 벡터
+                "embedding": emb
             }).execute()
 
         return {"status": "초기화 완료!", "count": len(qa_list)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 질문 받기
+# 질문 처리
 @app.post("/ask")
 async def ask(q: Question):
     try:
         emb = get_embedding(q.question)
         result = supabase.rpc("match_embeddings", {
             "query_embedding": emb,
-            "match_threshold": 0.78,
+            "match_threshold": 0.72,   # ← 더 자연스럽게 매칭되도록 0.72 추천
             "match_count": 1
         }).execute()
 
@@ -88,6 +82,7 @@ async def ask(q: Question):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# 루트 엔드포인트
 @app.get("/")
 async def root():
-    return {"message": "Perso.ai 챗봇 백엔드 정상 작동 중 (OpenAI 버전)"}
+    return {"message": "Perso.ai 챗봇 백엔드 정상 작동 중 (OpenAI + Railway)"}

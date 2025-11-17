@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8000"; // 배포 시 Vercel URL로 변경
+const API_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 export async function askQuestion(question: string): Promise<string> {
   const res = await fetch(`${API_URL}/ask`, {

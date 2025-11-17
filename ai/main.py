@@ -46,7 +46,7 @@ def get_embedding(text: str):
 @app.get("/init-db")
 async def init_db():
     try:
-        with open("../data/qa.json", "r", encoding="utf-8") as f:
+        with open("data/qa.json", "r", encoding="utf-8") as f:
             qa_list = json.load(f)
 
         supabase.table("embeddings").delete().neq("id", 0).execute()
